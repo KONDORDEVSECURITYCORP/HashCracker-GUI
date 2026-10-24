@@ -20,6 +20,7 @@ from .auto_attack import (
     run_auto_attack,
 )
 from .smart_attack import build_smart_stages
+from .hybrid_attack import build_hybrid_stages
 from .core import AttackMode, CrackJob, hashcat_version, run_hashcat
 from .detector import detect_hash
 from .results import CrackResult, ResultsStore
@@ -223,6 +224,7 @@ class HashCrackerApp(ctk.CTk):
         self.combo_attack = ctk.CTkComboBox(
             sidebar,
             values=[
+                "🔥 — Hybrid Smart (dict+mask)",
                 "⚡ — Auto (recomendado)",
                 "🧠 — Smart (inteligente)",
                 "0 — Diccionario",
@@ -243,7 +245,7 @@ class HashCrackerApp(ctk.CTk):
             corner_radius=T.BUTTON_RADIUS,
             command=self._on_attack_change,
         )
-        self.combo_attack.set("⚡ — Auto (recomendado)")
+        self.combo_attack.set("🔥 — Hybrid Smart (dict+mask)")
         self.combo_attack.pack(fill="x", padx=T.PAD_MD, pady=T.PAD_XS)
 
         # Wordlist
@@ -315,8 +317,8 @@ class HashCrackerApp(ctk.CTk):
         self.btn_stop.pack(side="right", fill="x", expand=True)
         self.btn_stop.configure(state="disabled")
 
-        # Initially show auto mode layout
-        self._on_attack_change("⚡ — Auto (recomendado)")
+        # Initially show hybrid mode layout
+        self._on_attack_change("🔥 — Hybrid Smart (dict+mask)")
 
     # ── Main area ────────────────────────────────────────────
 
@@ -540,7 +542,7 @@ class HashCrackerApp(ctk.CTk):
                 self.console.append(f"     • {m.name} (modo {m.mode})", "info")
 
     def _on_attack_change(self, choice: str) -> None:
-        is_auto = choice.startswith("⚡") or choice.startswith("🧠")
+        is_auto = choice.startswith("⚡") or choice.startswith("🧠") or choice.startswith("🔥")
 
         if is_auto:
             # Auto mode: show wordlist (optional), hide mask
@@ -683,8 +685,9 @@ class HashCrackerApp(ctk.CTk):
         # ── Check if Auto mode selected ──────────────────────
         is_auto = self.combo_attack.get().startswith("⚡")
         is_smart = self.combo_attack.get().startswith("🧠")
-        if is_auto or is_smart:
-            self._start_auto(smart=is_smart)
+        is_hybrid = self.combo_attack.get().startswith("🔥")
+        if is_auto or is_smart or is_hybrid:
+            self._start_auto(smart=is_smart, hybrid=is_hybrid)
             return
 
         job = self._validate()
@@ -737,8 +740,8 @@ class HashCrackerApp(ctk.CTk):
 
     # ── Auto-attack methods ──────────────────────────────────
 
-    def _start_auto(self, smart: bool = False) -> None:
-        """Launch the multi-stage auto or smart attack."""
+    def _start_auto(self, smart: bool = False, hybrid: bool = False) -> None:
+        """Launch the multi-stage auto, smart, or hybrid attack."""
         hc_path = self.entry_hc_path.get().strip()
         if not hc_path or not Path(hc_path).is_file():
             self.console.append("✖ Ruta de hashcat no válida.", "error")
@@ -758,7 +761,17 @@ class HashCrackerApp(ctk.CTk):
         wordlist = self.entry_wordlist.get().strip()
         hashcat_dir = str(Path(hc_path).parent)
 
-        if smart:
+        if hybrid:
+            if not wordlist or not Path(wordlist).is_file():
+                self.console.append("⚠ Hybrid Smart requiere un wordlist. Cambiando a Smart…", "warning")
+                hybrid = False
+                smart = True
+
+        if hybrid:
+            stages = build_hybrid_stages(wordlist=wordlist, hashcat_dir=hashcat_dir)
+            engine_name = "🔥 HYBRID SMART"
+            badge_text = "HYBRID 🔥"
+        elif smart:
             stages = build_smart_stages(wordlist=wordlist, hashcat_dir=hashcat_dir)
             engine_name = "🧠 SMART ATTACK"
             badge_text = "SMART 🧠"
@@ -772,7 +785,7 @@ class HashCrackerApp(ctk.CTk):
         self.btn_start.configure(state="disabled")
         self.btn_stop.configure(state="normal")
         self.status_badge.set_status(badge_text, T.MAGENTA)
-        self.lbl_result_icon.configure(text="⚡" if not smart else "🧠")
+        self.lbl_result_icon.configure(text="⚡" if not smart and not hybrid else "🧠" if smart else "🔥")
         self.lbl_result_text.configure(text=f"{engine_name}: {len(stages)} etapas", text_color=T.YELLOW)
 
         self.console.append("")
