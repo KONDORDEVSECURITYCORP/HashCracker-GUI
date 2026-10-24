@@ -1,0 +1,15 @@
+[project]
+name = "hashcracker-gui"
+version = "1.0.0"
+description = "Modern dark-themed GUI wrapper for Hashcat with auto-detection and mask support"
+requires-python = ">=3.10"
+dependencies = [
+    "customtkinter>=5.2.0",
+]
+
+[project.scripts]
+hashcracker-gui = "hashcracker_gui.app:main"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
